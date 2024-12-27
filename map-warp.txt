@@ -1,0 +1,183 @@
+Create a python program to generate a map image, where distances are distorted
+according to the actual travel time it takes to get to a place by car, rather than
+the cartesian distance.  For example, a fast moving highway might move a distant part
+of town closer on the map.
+
+Do this by following these steps.  Use AWS boto3 calls for any Location Services tasks.  Use tqdm to show progress for any iterative tasks.
+Load AWS environment variables using python_dotenv.  Add logging and liberal progress updates throughout the process using INFO level logging.
+
+Given a starting address
+
+1 - geocode the address to get the corresponding coordinate
+2 - Use the geo-maps get_static_map API to get a satellite map of the area within a 10 mile radius, save the file as original_map.png
+3 - generate a grid of points covering the map area
+4 - determine travel times by car from the starting address to each grid point, preferably in parallel, throttled to prevent errors
+5 - scale the distance from the starting point to the grid point along its vector, given the travel time
+6 - create a 60 frame animation consisting of frames showing the progression from no change to full warp.
+7 - For each frame, use RBF to warp the original map image.  overlay the points as purple dots on the map image
+8 - output the points as GeoJSON with their original lat longs and their new x/y positions on the map as metadata
+
+AWS Place Index to use: MyPlaceIndex
+AWS route calculator to use: MyRouteCalculator
+
+Starting address example: 1600 Pennsylvania Ave, Washington DC
+
+Use this documentation for the geo-maps client (also called LocationServicesMapsV2) get_static_map API:
+session.client('geo-maps').get_static_map
+LocationServiceMapsV2.Client.get_static_map(**kwargs)
+Provides high-quality static map images with customizable options. You can modify the map's appearance and overlay additional information. It's an ideal solution for applications requiring tailored static map snapshots.
+
+See also: AWS API Documentation
+
+Request Syntax
+response = client.get_static_map(
+    BoundingBox='string',
+    BoundedPositions='string',
+    Center='string',
+    CompactOverlay='string',
+    GeoJsonOverlay='string',
+    Height=123,
+    Key='string',
+    Padding=123,
+    Radius=123,
+    FileName='string',
+    ScaleBarUnit='Kilometers'|'KilometersMiles'|'Miles'|'MilesKilometers',
+    Style='Satellite',
+    Width=123,
+    Zoom=...
+)
+Parameters:
+BoundingBox (string) –
+
+Takes in two pairs of coordinates, [Lon, Lat], denoting south-westerly and north-easterly edges of the image. The underlying area becomes the view of the image.
+
+Example: -123.17075,49.26959,-123.08125,49.31429
+
+BoundedPositions (string) –
+
+Takes in two or more pair of coordinates, [Lon, Lat], with each coordinate separated by a comma. The API will generate an image to encompass all of the provided coordinates.
+
+Note
+Cannot be used with Zoom and or Radius
+
+Example: 97.170451,78.039098,99.045536,27.176178
+
+Center (string) –
+
+Takes in a pair of coordinates, [Lon, Lat], which becomes the center point of the image. This parameter requires that either zoom or radius is set.
+
+Note
+Cannot be used with Zoom and or Radius
+
+Example: 49.295,-123.108
+
+CompactOverlay (string) –
+
+Takes in a string to draw geometries on the image. The input is a comma separated format as follows format: [Lon, Lat]
+
+Example: line:-122.407653,37.798557,-122.413291,37.802443;color=%23DD0000;width=7;outline-color=#00DD00;outline-width=5yd|point:-122.40572,37.80004;label=Fog Hill Market;size=large;text-color=%23DD0000;color=#EE4B2B
+
+Note
+Currently it supports the following geometry types: point, line and polygon. It does not support multiPoint , multiLine and multiPolgyon.
+
+GeoJsonOverlay (string) –
+
+Takes in a string to draw geometries on the image. The input is a valid GeoJSON collection object.
+
+Example: {"type":"FeatureCollection","features": [{"type":"Feature","geometry":{"type":"MultiPoint","coordinates": [[-90.076345,51.504107],[-0.074451,51.506892]]},"properties": {"color":"#00DD00"}}]}
+
+Height (integer) –
+
+[REQUIRED]
+
+Specifies the height of the map image.
+
+Key (string) – Optional: The API key to be used for authorization. Either an API key or valid SigV4 signature must be provided when making a request.
+
+Padding (integer) –
+
+Applies additional space (in pixels) around overlay feature to prevent them from being cut or obscured.
+
+Note
+Value for max and min is determined by:
+
+Min: 1
+
+Max: min(height, width)/4
+
+Example: 100
+
+Radius (integer) –
+
+Used with center parameter, it specifies the zoom of the image where you can control it on a granular level. Takes in any value >= 1.
+
+Example: 1500
+
+Note
+Cannot be used with Zoom.
+
+Unit: Meters
+
+FileName (string) –
+
+[REQUIRED]
+
+The map scaling parameter to size the image, icons, and labels. It follows the pattern of ^map(@2x)?$.
+
+Example: map, map@2x
+
+ScaleBarUnit (string) –
+
+Displays a scale on the bottom right of the map image with the unit specified in the input.
+
+Example: KilometersMiles, Miles, Kilometers, MilesKilometers
+
+Style (string) – Style specifies the desired map style for the Style APIs.
+
+Width (integer) –
+
+[REQUIRED]
+
+Specifies the width of the map image.
+
+Zoom (float) –
+
+Specifies the zoom level of the map image.
+
+Note
+Cannot be used with Radius.
+
+Return type:
+dict
+
+Returns:
+Response Syntax
+{
+    'Blob': StreamingBody(),
+    'ContentType': 'string',
+    'CacheControl': 'string',
+    'ETag': 'string',
+    'PricingBucket': 'string'
+}
+Response Structure
+(dict) –
+
+Blob (StreamingBody) –
+
+The blob represents a map image as a jpeg for the GetStaticMap API.
+
+ContentType (string) –
+
+Header that represents the format of the response. The response returns the following as the HTTP body.
+
+CacheControl (string) –
+
+Header that instructs caching configuration for the client.
+
+ETag (string) –
+
+The static map's Etag.
+
+PricingBucket (string) –
+
+The pricing bucket for which the request is charged at.
